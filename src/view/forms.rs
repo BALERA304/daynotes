@@ -50,6 +50,8 @@ pub enum TaskAction {
 
 /// Форма задачи.
 pub struct TaskForm {
+    pub scroll: u16,
+    pub cursor: usize, // позиция курсора в активном поле (в символах)
     pub task: Task,
     pub field: TaskField,
     pub is_new: bool,
@@ -60,6 +62,8 @@ pub struct TaskForm {
 impl TaskForm {
     pub fn new() -> Self {
         Self {
+            scroll: 0,
+            cursor: 0,
             task: Task::new(String::new()),
             field: TaskField::Title,
             is_new: true,
@@ -70,6 +74,8 @@ impl TaskForm {
 
     pub fn edit(task: Task) -> Self {
         Self {
+            scroll: 0,
+            cursor: 0,
             task,
             field: TaskField::Title,
             is_new: false,
@@ -90,22 +96,41 @@ impl TaskForm {
             }
             KeyCode::Tab => {
                 self.field = self.field.next();
+                self.cursor = self.current_text().chars().count();
                 self.error = None;
             }
             KeyCode::BackTab => {
                 self.field = self.field.prev();
+                self.cursor = self.current_text().chars().count();
                 self.error = None;
             }
             KeyCode::Left => {
                 if self.field == TaskField::Priority {
                     self.task.priority = self.task.priority.prev();
                     self.dirty = true;
+                } else if self.cursor > 0 {
+                    self.cursor -= 1;
                 }
             }
             KeyCode::Right => {
                 if self.field == TaskField::Priority {
                     self.task.priority = self.task.priority.next();
                     self.dirty = true;
+                } else {
+                    let len = self.current_text().chars().count();
+                    if self.cursor < len {
+                        self.cursor += 1;
+                    }
+                }
+            }
+            KeyCode::Home => {
+                if self.field != TaskField::Priority {
+                    self.cursor = 0;
+                }
+            }
+            KeyCode::End => {
+                if self.field != TaskField::Priority {
+                    self.cursor = self.current_text().chars().count();
                 }
             }
             KeyCode::F(2) => {
@@ -118,58 +143,114 @@ impl TaskForm {
             KeyCode::Enter => match self.field {
                 TaskField::Title | TaskField::Milestone => {
                     self.field = self.field.next();
+                    self.cursor = self.current_text().chars().count();
                 }
                 TaskField::Description | TaskField::Comment => {
-                    self.push_char('\n');
+                    self.insert_char('\n');
                 }
                 TaskField::Priority => {
                     self.field = self.field.next();
+                    self.cursor = self.current_text().chars().count();
                 }
             },
             KeyCode::Backspace => {
-                self.pop_char();
+                self.delete_char();
             }
             KeyCode::Char(c) => {
-                self.push_char(c);
+                self.insert_char(c);
             }
             _ => {}
         }
         None
     }
 
-    fn push_char(&mut self, c: char) {
-        self.dirty = true;
+    fn current_text(&self) -> &str {
         match self.field {
-            TaskField::Title => self.task.title.push(c),
-            TaskField::Description => self.task.description.push(c),
-            TaskField::Priority => {}
-            TaskField::Milestone => self.task.milestone.push(c),
-            TaskField::Comment => self.task.comment.push(c),
+            TaskField::Title => &self.task.title,
+            TaskField::Description => &self.task.description,
+            TaskField::Priority => "",
+            TaskField::Milestone => &self.task.milestone,
+            TaskField::Comment => &self.task.comment,
         }
     }
 
-    fn pop_char(&mut self) {
-        self.dirty = true;
+    fn current_text_mut(&mut self) -> &mut String {
         match self.field {
-            TaskField::Title => {
-                self.task.title.pop();
+            TaskField::Title => &mut self.task.title,
+            TaskField::Description => &mut self.task.description,
+            TaskField::Priority => panic!("приоритет не редактируется текстом"),
+            TaskField::Milestone => &mut self.task.milestone,
+            TaskField::Comment => &mut self.task.comment,
+        }
+    }
+
+    fn insert_char(&mut self, c: char) {
+        self.dirty = true;
+        let cursor = self.cursor;
+        let text = self.current_text_mut();
+        let byte_pos = text
+            .char_indices()
+            .nth(cursor)
+            .map(|(i, _)| i)
+            .unwrap_or(text.len());
+        text.insert(byte_pos, c);
+        self.cursor += 1;
+    }
+
+    fn delete_char(&mut self) {
+        if self.cursor == 0 {
+            return;
+        }
+        self.dirty = true;
+        let cursor = self.cursor;
+        let text = self.current_text_mut();
+        let byte_pos = text
+            .char_indices()
+            .nth(cursor - 1)
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        text.remove(byte_pos);
+        self.cursor -= 1;
+    }
+    /// Вычислить, на какой экранной строке находится курсор.
+    fn cursor_screen_line(&self, width: u16) -> usize {
+        if width == 0 {
+            return 0;
+        }
+        let before: String = self.current_text().chars().take(self.cursor).collect();
+        let mut line = 0usize;
+        let mut col = 0u16;
+        for c in before.chars() {
+            if c == '\n' {
+                line += 1;
+                col = 0;
+            } else {
+                if col >= width {
+                    line += 1;
+                    col = 0;
+                }
+                col += 1;
             }
-            TaskField::Description => {
-                self.task.description.pop();
-            }
-            TaskField::Priority => {}
-            TaskField::Milestone => {
-                self.task.milestone.pop();
-            }
-            TaskField::Comment => {
-                self.task.comment.pop();
-            }
+        }
+        line
+    }
+
+    /// Пересчитать scroll так, чтобы курсор был виден.
+    pub fn adjust_scroll(&mut self, visible_height: u16, width: u16) {
+        if width == 0 || visible_height == 0 {
+            return;
+        }
+        let cursor_line = self.cursor_screen_line(width);
+        if cursor_line < self.scroll as usize {
+            self.scroll = cursor_line as u16;
+        } else if cursor_line >= self.scroll as usize + visible_height as usize {
+            self.scroll = (cursor_line - visible_height as usize + 1) as u16;
         }
     }
 }
 
 /// Отрисовать форму задачи.
-pub fn draw_task_form(f: &mut Frame, form: &TaskForm, area: Rect) {
+pub fn draw_task_form(f: &mut Frame, form: &mut TaskForm, area: Rect) {
     let popup = centered_rect(80, 90, area);
     f.render_widget(Clear, popup);
 
@@ -194,21 +275,58 @@ pub fn draw_task_form(f: &mut Frame, form: &TaskForm, area: Rect) {
             Constraint::Length(3),
         ])
         .split(inner);
-
+    // Пересчитать скролл активного поля.
+    match form.field {
+        TaskField::Title => {
+            let h = chunks[0].height.saturating_sub(2);
+            let w = chunks[0].width.saturating_sub(2);
+            form.adjust_scroll(h, w);
+        }
+        TaskField::Description => {
+            let h = chunks[1].height.saturating_sub(2);
+            let w = chunks[1].width.saturating_sub(2);
+            form.adjust_scroll(h, w);
+        }
+        TaskField::Milestone => {
+            let h = chunks[3].height.saturating_sub(2);
+            let w = chunks[3].width.saturating_sub(2);
+            form.adjust_scroll(h, w);
+        }
+        TaskField::Comment => {
+            let h = chunks[4].height.saturating_sub(2);
+            let w = chunks[4].width.saturating_sub(2);
+            form.adjust_scroll(h, w);
+        }
+        TaskField::Priority => {}
+    }
+    let title_focused = form.field == TaskField::Title;
     draw_field(
         f,
         chunks[0],
         "Название",
         &form.task.title,
-        form.field == TaskField::Title,
+        title_focused,
+        if title_focused {
+            Some(form.cursor)
+        } else {
+            None
+        },
+        if title_focused { form.scroll } else { 0 },
     );
 
+    let desc_focused = form.field == TaskField::Description;
     draw_field(
         f,
         chunks[1],
         "Описание",
         &form.task.description,
-        form.field == TaskField::Description,
+        desc_focused,
+        if desc_focused {
+            Some(form.cursor)
+        } else {
+            None
+        },
+        if desc_focused { form.scroll } else { 0 },
     );
 
     draw_priority_field(
@@ -218,27 +336,41 @@ pub fn draw_task_form(f: &mut Frame, form: &TaskForm, area: Rect) {
         form.field == TaskField::Priority,
     );
 
+    let milestone_focused = form.field == TaskField::Milestone;
     draw_field(
         f,
         chunks[3],
         "Веха",
         &form.task.milestone,
-        form.field == TaskField::Milestone,
+        milestone_focused,
+        if milestone_focused {
+            Some(form.cursor)
+        } else {
+            None
+        },
+        if milestone_focused { form.scroll } else { 0 },
     );
 
+    let comment_focused = form.field == TaskField::Comment;
     draw_field(
         f,
         chunks[4],
         "Комментарий",
         &form.task.comment,
-        form.field == TaskField::Comment,
+        comment_focused,
+        if comment_focused {
+            Some(form.cursor)
+        } else {
+            None
+        },
+        if comment_focused { form.scroll } else { 0 },
     );
 
     let hint = if let Some(err) = &form.error {
         Span::styled(err.clone(), Style::default().fg(Color::Red))
     } else {
         Span::styled(
-            "[F2] сохранить  [Esc] отмена",
+            "[F2] сохранить  [Esc] отмена  [←→] курсор  [Home/End] начало/конец",
             Style::default().fg(Color::DarkGray),
         )
     };
@@ -246,7 +378,18 @@ pub fn draw_task_form(f: &mut Frame, form: &TaskForm, area: Rect) {
     f.render_widget(p, chunks[5]);
 }
 
-fn draw_field(f: &mut Frame, area: Rect, label: &str, value: &str, focused: bool) {
+/// Отрисовать текстовое поле с курсором.
+///
+/// `cursor` — позиция курсора в символах, `None` если поле не в фокусе.
+fn draw_field(
+    f: &mut Frame,
+    area: Rect,
+    label: &str,
+    value: &str,
+    focused: bool,
+    cursor: Option<usize>,
+    scroll: u16,
+) {
     let style = if focused {
         Style::default().fg(Color::Yellow)
     } else {
@@ -258,10 +401,61 @@ fn draw_field(f: &mut Frame, area: Rect, label: &str, value: &str, focused: bool
         .title(format!(" {} ", label))
         .border_style(style);
 
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
     let p = Paragraph::new(value.to_string())
-        .block(block)
-        .wrap(Wrap { trim: true });
-    f.render_widget(p, area);
+        .wrap(Wrap { trim: false })
+        .scroll((scroll, 0));
+    f.render_widget(p, inner);
+
+    // Установить курсор, если поле в фокусе.
+    if let Some(cursor) = cursor {
+        if let Some((x, y)) = cursor_position(value, cursor, inner, scroll) {
+            f.set_cursor_position((x, y));
+        }
+    }
+}
+
+/// Вычислить позицию курсора на экране.
+///
+/// Возвращает (x, y) — абсолютные координаты в терминале.
+fn cursor_position(value: &str, cursor: usize, area: Rect, scroll: u16) -> Option<(u16, u16)> {
+    let width = area.width as usize;
+    if width == 0 {
+        return None;
+    }
+
+    let before: String = value.chars().take(cursor).collect();
+
+    let mut screen_line: usize = 0;
+    let mut col: usize = 0;
+
+    for c in before.chars() {
+        if c == '\n' {
+            screen_line += 1;
+            col = 0;
+        } else {
+            if col >= width {
+                screen_line += 1;
+                col = 0;
+            }
+            col += 1;
+        }
+    }
+
+    let visible_line = screen_line.saturating_sub(scroll as usize);
+
+    // Если курсор за пределами — прижимаем к границе.
+    let y = if visible_line >= area.height as usize {
+        area.y + area.height - 1
+    } else {
+        area.y + visible_line as u16
+    };
+
+    let x = area.x + (col as u16).min(area.width.saturating_sub(1));
+
+    Some((x, y))
 }
 
 fn draw_priority_field(f: &mut Frame, area: Rect, priority: Priority, focused: bool) {
@@ -338,6 +532,10 @@ pub fn draw_confirm(f: &mut Frame, confirm: &Confirm, area: Rect) {
     f.render_widget(p, popup);
 }
 
+// ============================================================
+// Форма направления
+// ============================================================
+
 /// Какое поле формы направления в фокусе.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DirectionField {
@@ -372,6 +570,8 @@ pub enum DirectionAction {
 
 /// Форма направления.
 pub struct DirectionForm {
+    pub scroll: u16,
+    pub cursor: usize,
     pub direction: crate::model::direction::Direction,
     pub field: DirectionField,
     pub is_new: bool,
@@ -383,6 +583,8 @@ pub struct DirectionForm {
 impl DirectionForm {
     pub fn new() -> Self {
         Self {
+            scroll: 0,
+            cursor: 0,
             direction: crate::model::direction::Direction::new(String::new()),
             field: DirectionField::Name,
             is_new: true,
@@ -394,6 +596,8 @@ impl DirectionForm {
 
     pub fn edit(direction: crate::model::direction::Direction) -> Self {
         Self {
+            scroll: 0,
+            cursor: 0,
             original_name: direction.name.clone(),
             direction,
             field: DirectionField::Name,
@@ -415,22 +619,41 @@ impl DirectionForm {
             }
             KeyCode::Tab => {
                 self.field = self.field.next();
+                self.cursor = self.current_text().chars().count();
                 self.error = None;
             }
             KeyCode::BackTab => {
                 self.field = self.field.prev();
+                self.cursor = self.current_text().chars().count();
                 self.error = None;
             }
             KeyCode::Left => {
                 if self.field == DirectionField::Priority {
                     self.direction.priority = self.direction.priority.prev();
                     self.dirty = true;
+                } else if self.cursor > 0 {
+                    self.cursor -= 1;
                 }
             }
             KeyCode::Right => {
                 if self.field == DirectionField::Priority {
                     self.direction.priority = self.direction.priority.next();
                     self.dirty = true;
+                } else {
+                    let len = self.current_text().chars().count();
+                    if self.cursor < len {
+                        self.cursor += 1;
+                    }
+                }
+            }
+            KeyCode::Home => {
+                if self.field != DirectionField::Priority {
+                    self.cursor = 0;
+                }
+            }
+            KeyCode::End => {
+                if self.field != DirectionField::Priority {
+                    self.cursor = self.current_text().chars().count();
                 }
             }
             KeyCode::F(2) => {
@@ -443,50 +666,108 @@ impl DirectionForm {
             KeyCode::Enter => match self.field {
                 DirectionField::Name => {
                     self.field = self.field.next();
+                    self.cursor = self.current_text().chars().count();
                 }
                 DirectionField::Description => {
-                    self.push_char('\n');
+                    self.insert_char('\n');
                 }
                 DirectionField::Priority => {
                     self.field = self.field.next();
+                    self.cursor = self.current_text().chars().count();
                 }
             },
             KeyCode::Backspace => {
-                self.pop_char();
+                self.delete_char();
             }
             KeyCode::Char(c) => {
-                self.push_char(c);
+                self.insert_char(c);
             }
             _ => {}
         }
         None
     }
 
-    fn push_char(&mut self, c: char) {
-        self.dirty = true;
+    fn current_text(&self) -> &str {
         match self.field {
-            DirectionField::Name => self.direction.name.push(c),
-            DirectionField::Description => self.direction.description.push(c),
-            DirectionField::Priority => {}
+            DirectionField::Name => &self.direction.name,
+            DirectionField::Description => &self.direction.description,
+            DirectionField::Priority => "",
         }
     }
 
-    fn pop_char(&mut self) {
-        self.dirty = true;
+    fn current_text_mut(&mut self) -> &mut String {
         match self.field {
-            DirectionField::Name => {
-                self.direction.name.pop();
+            DirectionField::Name => &mut self.direction.name,
+            DirectionField::Description => &mut self.direction.description,
+            DirectionField::Priority => panic!("приоритет не редактируется текстом"),
+        }
+    }
+
+    fn insert_char(&mut self, c: char) {
+        self.dirty = true;
+        let cursor = self.cursor;
+        let text = self.current_text_mut();
+        let byte_pos = text
+            .char_indices()
+            .nth(cursor)
+            .map(|(i, _)| i)
+            .unwrap_or(text.len());
+        text.insert(byte_pos, c);
+        self.cursor += 1;
+    }
+
+    fn delete_char(&mut self) {
+        if self.cursor == 0 {
+            return;
+        }
+        self.dirty = true;
+        let cursor = self.cursor;
+        let text = self.current_text_mut();
+        let byte_pos = text
+            .char_indices()
+            .nth(cursor - 1)
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        text.remove(byte_pos);
+        self.cursor -= 1;
+    }
+    fn cursor_screen_line(&self, width: u16) -> usize {
+        if width == 0 {
+            return 0;
+        }
+        let before: String = self.current_text().chars().take(self.cursor).collect();
+        let mut line = 0usize;
+        let mut col = 0u16;
+        for c in before.chars() {
+            if c == '\n' {
+                line += 1;
+                col = 0;
+            } else {
+                if col >= width {
+                    line += 1;
+                    col = 0;
+                }
+                col += 1;
             }
-            DirectionField::Description => {
-                self.direction.description.pop();
-            }
-            DirectionField::Priority => {}
+        }
+        line
+    }
+
+    pub fn adjust_scroll(&mut self, visible_height: u16, width: u16) {
+        if width == 0 || visible_height == 0 {
+            return;
+        }
+        let cursor_line = self.cursor_screen_line(width);
+        if cursor_line < self.scroll as usize {
+            self.scroll = cursor_line as u16;
+        } else if cursor_line >= self.scroll as usize + visible_height as usize {
+            self.scroll = (cursor_line - visible_height as usize + 1) as u16;
         }
     }
 }
 
 /// Отрисовать форму направления.
-pub fn draw_direction_form(f: &mut Frame, form: &DirectionForm, area: Rect) {
+pub fn draw_direction_form(f: &mut Frame, form: &mut DirectionForm, area: Rect) {
     let popup = centered_rect(80, 90, area);
     f.render_widget(Clear, popup);
 
@@ -504,26 +785,54 @@ pub fn draw_direction_form(f: &mut Frame, form: &DirectionForm, area: Rect) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
-            Constraint::Length(15),
+            Constraint::Min(15),
             Constraint::Length(3),
             Constraint::Length(3),
         ])
         .split(inner);
+    // Пересчитать скролл активного поля.
+    match form.field {
+        DirectionField::Name => {
+            let h = chunks[0].height.saturating_sub(2);
+            let w = chunks[0].width.saturating_sub(2);
+            form.adjust_scroll(h, w);
+        }
+        DirectionField::Description => {
+            let h = chunks[1].height.saturating_sub(2);
+            let w = chunks[1].width.saturating_sub(2);
+            form.adjust_scroll(h, w);
+        }
+        DirectionField::Priority => {}
+    }
 
+    let name_focused = form.field == DirectionField::Name;
     draw_field(
         f,
         chunks[0],
         "Название",
         &form.direction.name,
-        form.field == DirectionField::Name,
+        name_focused,
+        if name_focused {
+            Some(form.cursor)
+        } else {
+            None
+        },
+        if name_focused { form.scroll } else { 0 },
     );
 
+    let desc_focused = form.field == DirectionField::Description;
     draw_field(
         f,
         chunks[1],
         "Описание",
         &form.direction.description,
-        form.field == DirectionField::Description,
+        desc_focused,
+        if desc_focused {
+            Some(form.cursor)
+        } else {
+            None
+        },
+        if desc_focused { form.scroll } else { 0 },
     );
 
     draw_priority_field(
@@ -537,7 +846,7 @@ pub fn draw_direction_form(f: &mut Frame, form: &DirectionForm, area: Rect) {
         Span::styled(err.clone(), Style::default().fg(Color::Red))
     } else {
         Span::styled(
-            "[F2] сохранить  [Esc] отмена",
+            "[F2] сохранить  [Esc] отмена  [←→] курсор  [Home/End] начало/конец",
             Style::default().fg(Color::DarkGray),
         )
     };

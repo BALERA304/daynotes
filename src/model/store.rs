@@ -88,6 +88,7 @@ impl Store {
     }
 
     /// Найти направление по имени.
+    #[allow(dead_code)]
     pub fn find_direction(&self, name: &str) -> Option<&Direction> {
         self.directions.iter().find(|d| d.name == name)
     }

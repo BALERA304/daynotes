@@ -30,6 +30,7 @@ pub fn parse(s: &str) -> Result<NaiveDate> {
 }
 
 /// Отформатировать `NaiveDate` в `дд-мм-гггг`.
+#[allow(dead_code)]
 pub fn format(date: NaiveDate) -> String {
     date.format(DATE_FORMAT).to_string()
 }
@@ -56,11 +57,13 @@ pub fn is_past(date: &str) -> Result<bool> {
 }
 
 /// Проверить, что дата сегодня.
+#[allow(dead_code)]
 pub fn is_today(date: &str) -> Result<bool> {
     Ok(parse(date)? == Local::now().date_naive())
 }
 
 /// Проверить, что дата в будущем (строго позже сегодня).
+#[allow(dead_code)]
 pub fn is_future(date: &str) -> Result<bool> {
     let parsed = parse(date)?;
     let today = Local::now().date_naive();
@@ -68,6 +71,7 @@ pub fn is_future(date: &str) -> Result<bool> {
 }
 
 /// Проверить, что дата сегодня или в будущем.
+#[allow(dead_code)]
 pub fn is_today_or_future(date: &str) -> Result<bool> {
     let parsed = parse(date)?;
     let today = Local::now().date_naive();

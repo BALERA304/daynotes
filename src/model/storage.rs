@@ -117,6 +117,7 @@ pub fn save(store: &Store) -> Result<()> {
 ///
 /// Возвращает Ok(true), если файл есть и он битый.
 /// Возвращает Ok(false), если файла нет или он валиден.
+#[allow(dead_code)]
 pub fn is_corrupted() -> Result<bool> {
     let path = file_path()?;
     if !path.exists() {
@@ -128,6 +129,8 @@ pub fn is_corrupted() -> Result<bool> {
 }
 
 /// Создать новый пустой Store и записать его.
+#[allow(dead_code)]
+
 pub fn create_new() -> Result<Store> {
     let store = Store::new();
     save(&store)?;
@@ -137,6 +140,7 @@ pub fn create_new() -> Result<Store> {
 /// Восстановить Store из бэкапа.
 ///
 /// Копирует `backup.json` в `day_notes.json` и загружает его.
+#[allow(dead_code)]
 pub fn restore_from_backup() -> Result<Store> {
     let backup = backup_path()?;
     let file = file_path()?;

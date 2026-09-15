@@ -119,6 +119,7 @@ pub fn delete_task(date_str: &str, task_id: &str) -> Result<()> {
 }
 
 /// Установить комментарий задачи.
+#[allow(dead_code)]
 pub fn set_task_comment(date_str: &str, task_id: &str, comment: String) -> Result<()> {
     date::validate(date_str)?;
     let mut store = load_store()?;

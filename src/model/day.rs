@@ -29,6 +29,7 @@ impl Day {
     }
 
     /// Найти задачу по id.
+    #[allow(dead_code)]
     pub fn find_task(&self, id: &str) -> Option<&Task> {
         self.tasks.iter().find(|t| t.id == id)
     }
@@ -46,11 +47,14 @@ impl Day {
     }
 
     /// Все ли задачи выполнены.
+    #[allow(dead_code)]
     pub fn all_done(&self) -> bool {
         self.tasks.iter().all(|t| t.is_done())
     }
 
     /// Сколько задач выполнено.
+
+    #[allow(dead_code)]
     pub fn done_count(&self) -> usize {
         self.tasks.iter().filter(|t| t.is_done()).count()
     }
