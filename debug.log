@@ -1,0 +1,118 @@
+   Compiling dn v0.1.0 (/home/hottea/Проекты/dn)
+warning: function `set_task_comment` is never used
+   --> src/controller/actions.rs:122:8
+    |
+122 | pub fn set_task_comment(date_str: &str, task_id: &str, comment: String) -> Result<()> {
+    |        ^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `format` is never used
+  --> src/model/date.rs:33:8
+   |
+33 | pub fn format(date: NaiveDate) -> String {
+   |        ^^^^^^
+
+warning: function `is_today` is never used
+  --> src/model/date.rs:59:8
+   |
+59 | pub fn is_today(date: &str) -> Result<bool> {
+   |        ^^^^^^^^
+
+warning: function `is_future` is never used
+  --> src/model/date.rs:64:8
+   |
+64 | pub fn is_future(date: &str) -> Result<bool> {
+   |        ^^^^^^^^^
+
+warning: function `is_today_or_future` is never used
+  --> src/model/date.rs:71:8
+   |
+71 | pub fn is_today_or_future(date: &str) -> Result<bool> {
+   |        ^^^^^^^^^^^^^^^^^^
+
+warning: methods `find_task`, `all_done`, and `done_count` are never used
+  --> src/model/day.rs:32:12
+   |
+13 | impl Day {
+   | -------- methods in this implementation
+...
+32 |     pub fn find_task(&self, id: &str) -> Option<&Task> {
+   |            ^^^^^^^^^
+...
+49 |     pub fn all_done(&self) -> bool {
+   |            ^^^^^^^^
+...
+54 |     pub fn done_count(&self) -> usize {
+   |            ^^^^^^^^^^
+
+warning: function `is_corrupted` is never used
+   --> src/model/storage.rs:120:8
+    |
+120 | pub fn is_corrupted() -> Result<bool> {
+    |        ^^^^^^^^^^^^
+
+warning: function `create_new` is never used
+   --> src/model/storage.rs:131:8
+    |
+131 | pub fn create_new() -> Result<Store> {
+    |        ^^^^^^^^^^
+
+warning: function `restore_from_backup` is never used
+   --> src/model/storage.rs:140:8
+    |
+140 | pub fn restore_from_backup() -> Result<Store> {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: method `find_direction` is never used
+  --> src/model/store.rs:91:12
+   |
+38 | impl Store {
+   | ---------- method in this implementation
+...
+91 |     pub fn find_direction(&self, name: &str) -> Option<&Direction> {
+   |            ^^^^^^^^^^^^^^
+
+warning: `dn` (bin "dn") generated 10 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.39s
+     Running `target/debug/dn`
+CHAR: 'ф' (код: 1092), kind: Press
+CHAR: 'ф' (код: 1092), kind: Press
+CHAR: 'ы' (код: 1099), kind: Press
+CHAR: 'ф' (код: 1092), kind: Press
+CHAR: 'ы' (код: 1099), kind: Press
+CHAR: 'в' (код: 1074), kind: Press
+CHAR: 'ф' (код: 1092), kind: Press
+CHAR: 'ы' (код: 1099), kind: Press
+CHAR: 'в' (код: 1074), kind: Press
+CHAR: 'а' (код: 1072), kind: Press
+CHAR: 'ф' (код: 1092), kind: Press
+CHAR: 'ы' (код: 1099), kind: Press
+CHAR: 'в' (код: 1074), kind: Press
+CHAR: 'ф' (код: 1092), kind: Press
+CHAR: 'ы' (код: 1099), kind: Press
+CHAR: 'ы' (код: 1099), kind: Press
+CHAR: 'к' (код: 1082), kind: Press
+CHAR: 'а' (код: 1072), kind: Press
+CHAR: 'в' (код: 1074), kind: Press
+CHAR: 'ы' (код: 1099), kind: Press
+CHAR: 'в' (код: 1074), kind: Press
+CHAR: 'а' (код: 1072), kind: Press
+CHAR: 'п' (код: 1087), kind: Press
+CHAR: 'а' (код: 1072), kind: Press
+CHAR: 'ы' (код: 1099), kind: Press
+CHAR: 'в' (код: 1074), kind: Press
+CHAR: 'в' (код: 1074), kind: Press
+CHAR: 'в' (код: 1074), kind: Press
+CHAR: 'q' (код: 113), kind: Press
+CHAR: 'н' (код: 1085), kind: Press
+CHAR: 'н' (код: 1085), kind: Press
+CHAR: 'н' (код: 1085), kind: Press
+CHAR: 'н' (код: 1085), kind: Press
+CHAR: 'н' (код: 1085), kind: Press
+CHAR: 'н' (код: 1085), kind: Press
+CHAR: 'н' (код: 1085), kind: Press
+CHAR: 'н' (код: 1085), kind: Press
+CHAR: 'н' (код: 1085), kind: Press
+CHAR: 'т' (код: 1090), kind: Press
+CHAR: 'y' (код: 121), kind: Press
