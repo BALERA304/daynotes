@@ -39,12 +39,6 @@ pub enum Commands {
 
 #[derive(Subcommand)]
 pub enum DirectionCommands {
-    /// Создать направление (открывает TUI-форму)
-    Add,
-
-    /// Редактировать направление (открывает TUI-форму)
-    Edit,
-
     /// Удалить направление
     Delete {
         /// Название направления

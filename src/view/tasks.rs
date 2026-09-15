@@ -128,3 +128,207 @@ pub fn truncate(s: &str, max: usize) -> String {
     result.push('…');
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- Priority ---
+
+    #[test]
+    fn test_priority_weight() {
+        assert_eq!(Priority::High.weight(), 3);
+        assert_eq!(Priority::Med.weight(), 2);
+        assert_eq!(Priority::Low.weight(), 1);
+    }
+
+    #[test]
+    fn test_priority_label() {
+        assert_eq!(Priority::High.label(), "high");
+        assert_eq!(Priority::Med.label(), "med");
+        assert_eq!(Priority::Low.label(), "low");
+    }
+
+    #[test]
+    fn test_priority_next() {
+        assert_eq!(Priority::Low.next(), Priority::Med);
+        assert_eq!(Priority::Med.next(), Priority::High);
+        assert_eq!(Priority::High.next(), Priority::Low);
+    }
+
+    #[test]
+    fn test_priority_prev() {
+        assert_eq!(Priority::Low.prev(), Priority::High);
+        assert_eq!(Priority::High.prev(), Priority::Med);
+        assert_eq!(Priority::Med.prev(), Priority::Low);
+    }
+
+    #[test]
+    fn test_priority_next_prev_roundtrip() {
+        for p in [Priority::Low, Priority::Med, Priority::High] {
+            assert_eq!(p.next().prev(), p);
+            assert_eq!(p.prev().next(), p);
+        }
+    }
+
+    #[test]
+    fn test_priority_default() {
+        assert_eq!(Priority::default(), Priority::Med);
+    }
+
+    #[test]
+    fn test_priority_serde_roundtrip() {
+        for p in [Priority::Low, Priority::Med, Priority::High] {
+            let json = serde_json::to_string(&p).unwrap();
+            let parsed: Priority = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed, p);
+        }
+    }
+
+    #[test]
+    fn test_priority_serde_lowercase() {
+        let json = serde_json::to_string(&Priority::High).unwrap();
+        assert_eq!(json, "\"high\"");
+    }
+
+    // --- Task ---
+
+    #[test]
+    fn test_task_new() {
+        let task = Task::new("Тест".to_string());
+        assert_eq!(task.title, "Тест");
+        assert_eq!(task.description, "");
+        assert_eq!(task.priority, Priority::Med);
+        assert_eq!(task.milestone, "");
+        assert_eq!(task.comment, "");
+        assert_eq!(task.id.len(), 8);
+    }
+
+    #[test]
+    fn test_task_new_unique_ids() {
+        let t1 = Task::new("A".to_string());
+        let t2 = Task::new("B".to_string());
+        assert_ne!(t1.id, t2.id);
+    }
+
+    #[test]
+    fn test_task_is_done_empty() {
+        let task = Task::new("Тест".to_string());
+        assert!(!task.is_done());
+    }
+
+    #[test]
+    fn test_task_is_done_with_comment() {
+        let mut task = Task::new("Тест".to_string());
+        task.comment = "Сделал".to_string();
+        assert!(task.is_done());
+    }
+
+    #[test]
+    fn test_task_is_done_whitespace_only() {
+        let mut task = Task::new("Тест".to_string());
+        task.comment = "   ".to_string();
+        assert!(!task.is_done());
+    }
+
+    #[test]
+    fn test_task_is_done_newlines_only() {
+        let mut task = Task::new("Тест".to_string());
+        task.comment = "\n\n".to_string();
+        assert!(!task.is_done());
+    }
+
+    #[test]
+    fn test_task_serde_roundtrip() {
+        let mut task = Task::new("Прочитать книгу".to_string());
+        task.description = "Глава 1".to_string();
+        task.priority = Priority::High;
+        task.milestone = "Изучить Rust".to_string();
+        task.comment = "Готово".to_string();
+
+        let json = serde_json::to_string(&task).unwrap();
+        let parsed: Task = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.id, task.id);
+        assert_eq!(parsed.title, task.title);
+        assert_eq!(parsed.description, task.description);
+        assert_eq!(parsed.priority, task.priority);
+        assert_eq!(parsed.milestone, task.milestone);
+        assert_eq!(parsed.comment, task.comment);
+    }
+
+    #[test]
+    fn test_task_serde_defaults() {
+        let json = r#"{"id":"abc12345","title":"Тест"}"#;
+        let task: Task = serde_json::from_str(json).unwrap();
+        assert_eq!(task.description, "");
+        assert_eq!(task.priority, Priority::Med);
+        assert_eq!(task.milestone, "");
+        assert_eq!(task.comment, "");
+    }
+
+    // --- truncate ---
+
+    #[test]
+    fn test_truncate_shorter() {
+        assert_eq!(truncate("abc", 10), "abc");
+    }
+
+    #[test]
+    fn test_truncate_equal() {
+        assert_eq!(truncate("abc", 3), "abc");
+    }
+
+    #[test]
+    fn test_truncate_longer() {
+        assert_eq!(truncate("abcdef", 4), "abc…");
+    }
+
+    #[test]
+    fn test_truncate_max_zero() {
+        assert_eq!(truncate("abc", 0), "");
+    }
+
+    #[test]
+    fn test_truncate_max_one() {
+        assert_eq!(truncate("abcdef", 1), "…");
+    }
+
+    #[test]
+    fn test_truncate_max_two() {
+        assert_eq!(truncate("abcdef", 2), "a…");
+    }
+
+    #[test]
+    fn test_truncate_empty() {
+        assert_eq!(truncate("", 10), "");
+        assert_eq!(truncate("", 0), "");
+    }
+
+    #[test]
+    fn test_truncate_cyrillic() {
+        assert_eq!(truncate("Привет", 4), "При…");
+    }
+
+    #[test]
+    fn test_truncate_cyrillic_equal() {
+        assert_eq!(truncate("Привет", 6), "Привет");
+    }
+
+    // --- priority_color ---
+
+    #[test]
+    fn test_priority_color_high() {
+        assert_eq!(priority_color(Priority::High), Color::Red);
+    }
+
+    #[test]
+    fn test_priority_color_med() {
+        assert_eq!(priority_color(Priority::Med), Color::Blue);
+    }
+
+    #[test]
+    fn test_priority_color_low() {
+        assert_eq!(priority_color(Priority::Low), Color::Green);
+    }
+}

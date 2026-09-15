@@ -8,6 +8,9 @@ use clap::Parser;
 use cli::{Cli, Commands, DirectionCommands};
 
 fn main() -> Result<()> {
+    // Проверка бэкапа и восстановление — до всего остального.
+    check_and_restore()?;
+
     let cli = Cli::parse();
 
     match cli.command {
@@ -36,12 +39,6 @@ fn main() -> Result<()> {
             print_stats(&stats);
         }
         Some(Commands::Direction(cmd)) => match cmd {
-            DirectionCommands::Add => {
-                println!("[dn direction add] — TUI-форма будет в Эпике 4");
-            }
-            DirectionCommands::Edit => {
-                println!("[dn direction edit] — TUI-форма будет в Эпике 4");
-            }
             DirectionCommands::Delete { name } => {
                 controller::actions::delete_direction(&name)?;
                 println!("удалено направление: {}", name);
@@ -50,6 +47,54 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Проверить целостность JSON. Если битый — предложить восстановить из бэкапа.
+fn check_and_restore() -> Result<()> {
+    use model::storage;
+
+    // Если файла нет — ничего не делаем, storage::load() создаст новый.
+    if !storage::file_path()?.exists() {
+        return Ok(());
+    }
+
+    // Если файл валидный — ок.
+    if !storage::is_corrupted()? {
+        return Ok(());
+    }
+
+    // Файл битый.
+    eprintln!("Ошибка: файл ~/.dn/day_notes.json повреждён.");
+    eprintln!();
+
+    let backup = storage::backup_path()?;
+    if backup.exists() {
+        eprintln!("Найден бэкап: {:?}", backup);
+        eprintln!("Восстановить из бэкапа? (y/n)");
+
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input)?;
+
+        if input.trim().eq_ignore_ascii_case("y") {
+            storage::restore_from_backup()?;
+            eprintln!("Восстановлено из бэкапа.");
+            return Ok(());
+        }
+    } else {
+        eprintln!("Бэкап не найден.");
+    }
+
+    eprintln!("Создать новый пустой файл? (y/n)");
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input)?;
+
+    if input.trim().eq_ignore_ascii_case("y") {
+        storage::create_new()?;
+        eprintln!("Создан новый пустой файл.");
+        Ok(())
+    } else {
+        anyhow::bail!("отменено пользователем");
+    }
 }
 
 fn print_stats(stats: &controller::actions::Stats) {
@@ -64,7 +109,6 @@ fn print_stats(stats: &controller::actions::Stats) {
     println!("за неделю: {}", stats.done_this_week);
     println!("за месяц:");
     for (month, count) in &stats.by_month {
-        // month — "мм-гггг", например "09-2026"
         let parts: Vec<&str> = month.split('-').collect();
         if parts.len() == 2 {
             let month_num = parts[0];

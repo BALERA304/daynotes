@@ -853,3 +853,322 @@ pub fn draw_direction_form(f: &mut Frame, form: &mut DirectionForm, area: Rect) 
     let p = Paragraph::new(Line::from(hint));
     f.render_widget(p, chunks[3]);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::task::Priority;
+
+    // --- TaskField ---
+
+    #[test]
+    fn test_task_field_next() {
+        assert_eq!(TaskField::Title.next(), TaskField::Description);
+        assert_eq!(TaskField::Description.next(), TaskField::Priority);
+        assert_eq!(TaskField::Priority.next(), TaskField::Milestone);
+        assert_eq!(TaskField::Milestone.next(), TaskField::Comment);
+        assert_eq!(TaskField::Comment.next(), TaskField::Title);
+    }
+
+    #[test]
+    fn test_task_field_prev() {
+        assert_eq!(TaskField::Title.prev(), TaskField::Comment);
+        assert_eq!(TaskField::Comment.prev(), TaskField::Milestone);
+        assert_eq!(TaskField::Milestone.prev(), TaskField::Priority);
+        assert_eq!(TaskField::Priority.prev(), TaskField::Description);
+        assert_eq!(TaskField::Description.prev(), TaskField::Title);
+    }
+
+    #[test]
+    fn test_task_field_roundtrip() {
+        for f in [
+            TaskField::Title,
+            TaskField::Description,
+            TaskField::Priority,
+            TaskField::Milestone,
+            TaskField::Comment,
+        ] {
+            assert_eq!(f.next().prev(), f);
+            assert_eq!(f.prev().next(), f);
+        }
+    }
+
+    // --- DirectionField ---
+
+    #[test]
+    fn test_direction_field_next() {
+        assert_eq!(DirectionField::Name.next(), DirectionField::Description);
+        assert_eq!(DirectionField::Description.next(), DirectionField::Priority);
+        assert_eq!(DirectionField::Priority.next(), DirectionField::Name);
+    }
+
+    #[test]
+    fn test_direction_field_prev() {
+        assert_eq!(DirectionField::Name.prev(), DirectionField::Priority);
+        assert_eq!(DirectionField::Priority.prev(), DirectionField::Description);
+        assert_eq!(DirectionField::Description.prev(), DirectionField::Name);
+    }
+
+    #[test]
+    fn test_direction_field_roundtrip() {
+        for f in [
+            DirectionField::Name,
+            DirectionField::Description,
+            DirectionField::Priority,
+        ] {
+            assert_eq!(f.next().prev(), f);
+            assert_eq!(f.prev().next(), f);
+        }
+    }
+
+    // --- TaskForm::new / edit ---
+
+    #[test]
+    fn test_task_form_new() {
+        let form = TaskForm::new();
+        assert!(form.is_new);
+        assert_eq!(form.field, TaskField::Title);
+        assert_eq!(form.cursor, 0);
+        assert_eq!(form.scroll, 0);
+        assert!(!form.dirty);
+        assert!(form.error.is_none());
+        assert_eq!(form.task.title, "");
+    }
+
+    #[test]
+    fn test_task_form_edit() {
+        let mut task = Task::new("Тест".to_string());
+        task.priority = Priority::High;
+
+        let form = TaskForm::edit(task.clone());
+        assert!(!form.is_new);
+        assert_eq!(form.field, TaskField::Title);
+        assert_eq!(form.cursor, 0);
+        assert!(!form.dirty);
+        assert_eq!(form.task.title, "Тест");
+        assert_eq!(form.task.priority, Priority::High);
+    }
+
+    // --- TaskForm::insert_char / delete_char ---
+
+    #[test]
+    fn test_task_insert_char_at_end() {
+        let mut form = TaskForm::new();
+        // Курсор на 0, поле Title.
+        form.insert_char('A');
+        form.insert_char('B');
+        form.insert_char('C');
+
+        assert_eq!(form.task.title, "ABC");
+        assert_eq!(form.cursor, 3);
+        assert!(form.dirty);
+    }
+
+    #[test]
+    fn test_task_insert_char_in_middle() {
+        let mut form = TaskForm::new();
+        form.task.title = "AC".to_string();
+        form.cursor = 1; // между A и C
+        form.insert_char('B');
+
+        assert_eq!(form.task.title, "ABC");
+        assert_eq!(form.cursor, 2);
+    }
+
+    #[test]
+    fn test_task_insert_char_at_start() {
+        let mut form = TaskForm::new();
+        form.task.title = "BC".to_string();
+        form.cursor = 0;
+        form.insert_char('A');
+
+        assert_eq!(form.task.title, "ABC");
+        assert_eq!(form.cursor, 1);
+    }
+
+    #[test]
+    fn test_task_delete_char_at_end() {
+        let mut form = TaskForm::new();
+        form.task.title = "ABC".to_string();
+        form.cursor = 3;
+        form.delete_char();
+
+        assert_eq!(form.task.title, "AB");
+        assert_eq!(form.cursor, 2);
+    }
+
+    #[test]
+    fn test_task_delete_char_in_middle() {
+        let mut form = TaskForm::new();
+        form.task.title = "ABC".to_string();
+        form.cursor = 2; // после B
+        form.delete_char();
+
+        assert_eq!(form.task.title, "AC");
+        assert_eq!(form.cursor, 1);
+    }
+
+    #[test]
+    fn test_task_delete_char_at_start() {
+        let mut form = TaskForm::new();
+        form.task.title = "ABC".to_string();
+        form.cursor = 0;
+        form.delete_char();
+
+        // Ничего не удаляется.
+        assert_eq!(form.task.title, "ABC");
+        assert_eq!(form.cursor, 0);
+    }
+
+    #[test]
+    fn test_task_delete_char_empty() {
+        let mut form = TaskForm::new();
+        form.cursor = 0;
+        form.delete_char();
+        assert_eq!(form.task.title, "");
+    }
+
+    #[test]
+    fn test_task_insert_cyrillic() {
+        let mut form = TaskForm::new();
+        form.insert_char('П');
+        form.insert_char('р');
+        form.insert_char('и');
+        form.insert_char('в');
+        form.insert_char('е');
+        form.insert_char('т');
+
+        assert_eq!(form.task.title, "Привет");
+        assert_eq!(form.cursor, 6);
+    }
+
+    #[test]
+    fn test_task_insert_newline() {
+        let mut form = TaskForm::new();
+        form.field = TaskField::Description;
+        form.insert_char('A');
+        form.insert_char('\n');
+        form.insert_char('B');
+
+        assert_eq!(form.task.description, "A\nB");
+        assert_eq!(form.cursor, 3);
+    }
+
+    #[test]
+    fn test_task_insert_into_milestone() {
+        let mut form = TaskForm::new();
+        form.field = TaskField::Milestone;
+        form.insert_char('X');
+
+        assert_eq!(form.task.milestone, "X");
+        assert_eq!(form.task.title, "");
+    }
+
+    #[test]
+    fn test_task_insert_into_comment() {
+        let mut form = TaskForm::new();
+        form.field = TaskField::Comment;
+        form.insert_char('Y');
+
+        assert_eq!(form.task.comment, "Y");
+    }
+
+    #[test]
+    fn test_task_dirty_flag() {
+        let mut form = TaskForm::new();
+        assert!(!form.dirty);
+        form.insert_char('A');
+        assert!(form.dirty);
+    }
+
+    #[test]
+    fn test_task_delete_sets_dirty() {
+        let mut form = TaskForm::new();
+        form.task.title = "A".to_string();
+        form.cursor = 1;
+        form.delete_char();
+        assert!(form.dirty);
+    }
+
+    // --- DirectionForm ---
+
+    #[test]
+    fn test_direction_form_new() {
+        let form = DirectionForm::new();
+        assert!(form.is_new);
+        assert_eq!(form.field, DirectionField::Name);
+        assert_eq!(form.cursor, 0);
+        assert_eq!(form.scroll, 0);
+        assert!(!form.dirty);
+        assert!(form.error.is_none());
+        assert_eq!(form.direction.name, "");
+        assert_eq!(form.original_name, "");
+    }
+
+    #[test]
+    fn test_direction_form_edit() {
+        let mut d = crate::model::direction::Direction::new("Здоровье".to_string());
+        d.priority = Priority::High;
+
+        let form = DirectionForm::edit(d.clone());
+        assert!(!form.is_new);
+        assert_eq!(form.field, DirectionField::Name);
+        assert_eq!(form.cursor, 0);
+        assert!(!form.dirty);
+        assert_eq!(form.direction.name, "Здоровье");
+        assert_eq!(form.direction.priority, Priority::High);
+        assert_eq!(form.original_name, "Здоровье");
+    }
+
+    #[test]
+    fn test_direction_insert_char() {
+        let mut form = DirectionForm::new();
+        form.insert_char('A');
+        form.insert_char('B');
+
+        assert_eq!(form.direction.name, "AB");
+        assert_eq!(form.cursor, 2);
+        assert!(form.dirty);
+    }
+
+    #[test]
+    fn test_direction_delete_char() {
+        let mut form = DirectionForm::new();
+        form.direction.name = "ABC".to_string();
+        form.cursor = 3;
+        form.delete_char();
+
+        assert_eq!(form.direction.name, "AB");
+        assert_eq!(form.cursor, 2);
+    }
+
+    #[test]
+    fn test_direction_insert_into_description() {
+        let mut form = DirectionForm::new();
+        form.field = DirectionField::Description;
+        form.insert_char('X');
+
+        assert_eq!(form.direction.description, "X");
+        assert_eq!(form.direction.name, "");
+    }
+
+    #[test]
+    fn test_direction_insert_cyrillic() {
+        let mut form = DirectionForm::new();
+        for c in "Здоровье".chars() {
+            form.insert_char(c);
+        }
+        assert_eq!(form.direction.name, "Здоровье");
+        assert_eq!(form.cursor, 8);
+    }
+
+    #[test]
+    fn test_direction_delete_at_start() {
+        let mut form = DirectionForm::new();
+        form.direction.name = "ABC".to_string();
+        form.cursor = 0;
+        form.delete_char();
+
+        assert_eq!(form.direction.name, "ABC");
+    }
+}

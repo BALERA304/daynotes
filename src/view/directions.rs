@@ -88,3 +88,135 @@ fn direction_item(d: &Direction, width: usize) -> ListItem<'static> {
 
     ListItem::new(Line::from(spans))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::task::Priority;
+
+    #[test]
+    fn test_direction_new() {
+        let d = Direction::new("Здоровье".to_string());
+        assert_eq!(d.name, "Здоровье");
+        assert_eq!(d.description, "");
+        assert_eq!(d.priority, Priority::Med);
+        assert_eq!(d.id.len(), 8);
+    }
+
+    #[test]
+    fn test_direction_new_unique_ids() {
+        let d1 = Direction::new("A".to_string());
+        let d2 = Direction::new("B".to_string());
+        assert_ne!(d1.id, d2.id);
+    }
+
+    #[test]
+    fn test_direction_empty_name() {
+        // Пустое имя — валидно на уровне структуры,
+        // валидация — на уровне формы.
+        let d = Direction::new("".to_string());
+        assert_eq!(d.name, "");
+    }
+
+    #[test]
+    fn test_direction_serde_roundtrip() {
+        let mut d = Direction::new("Здоровье".to_string());
+        d.description = "Регулярные тренировки, сон 8 часов".to_string();
+        d.priority = Priority::High;
+
+        let json = serde_json::to_string(&d).unwrap();
+        let parsed: Direction = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.id, d.id);
+        assert_eq!(parsed.name, d.name);
+        assert_eq!(parsed.description, d.description);
+        assert_eq!(parsed.priority, d.priority);
+    }
+
+    #[test]
+    fn test_direction_serde_defaults() {
+        // Минимальный JSON без description и priority.
+        let json = r#"{"id":"abc12345","name":"Здоровье"}"#;
+        let d: Direction = serde_json::from_str(json).unwrap();
+        assert_eq!(d.description, "");
+        assert_eq!(d.priority, Priority::Med);
+    }
+
+    #[test]
+    fn test_direction_serde_multiline_description() {
+        let mut d = Direction::new("Здоровье".to_string());
+        d.description = "Первая строка.\nВторая строка.\nТретья.".to_string();
+
+        let json = serde_json::to_string(&d).unwrap();
+        let parsed: Direction = serde_json::from_str(&json).unwrap();
+
+        assert!(parsed.description.contains('\n'));
+        assert_eq!(parsed.description.lines().count(), 3);
+    }
+}
+
+#[cfg(test)]
+mod tests1 {
+    use super::*;
+    use crate::model::task::Priority;
+
+    #[test]
+    fn test_direction_new() {
+        let d = Direction::new("Здоровье".to_string());
+        assert_eq!(d.name, "Здоровье");
+        assert_eq!(d.description, "");
+        assert_eq!(d.priority, Priority::Med);
+        assert_eq!(d.id.len(), 8);
+    }
+
+    #[test]
+    fn test_direction_new_unique_ids() {
+        let d1 = Direction::new("A".to_string());
+        let d2 = Direction::new("B".to_string());
+        assert_ne!(d1.id, d2.id);
+    }
+
+    #[test]
+    fn test_direction_empty_name() {
+        // Пустое имя — валидно на уровне структуры,
+        // валидация — на уровне формы.
+        let d = Direction::new("".to_string());
+        assert_eq!(d.name, "");
+    }
+
+    #[test]
+    fn test_direction_serde_roundtrip() {
+        let mut d = Direction::new("Здоровье".to_string());
+        d.description = "Регулярные тренировки, сон 8 часов".to_string();
+        d.priority = Priority::High;
+
+        let json = serde_json::to_string(&d).unwrap();
+        let parsed: Direction = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.id, d.id);
+        assert_eq!(parsed.name, d.name);
+        assert_eq!(parsed.description, d.description);
+        assert_eq!(parsed.priority, d.priority);
+    }
+
+    #[test]
+    fn test_direction_serde_defaults() {
+        // Минимальный JSON без description и priority.
+        let json = r#"{"id":"abc12345","name":"Здоровье"}"#;
+        let d: Direction = serde_json::from_str(json).unwrap();
+        assert_eq!(d.description, "");
+        assert_eq!(d.priority, Priority::Med);
+    }
+
+    #[test]
+    fn test_direction_serde_multiline_description() {
+        let mut d = Direction::new("Здоровье".to_string());
+        d.description = "Первая строка.\nВторая строка.\nТретья.".to_string();
+
+        let json = serde_json::to_string(&d).unwrap();
+        let parsed: Direction = serde_json::from_str(&json).unwrap();
+
+        assert!(parsed.description.contains('\n'));
+        assert_eq!(parsed.description.lines().count(), 3);
+    }
+}
