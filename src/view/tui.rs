@@ -28,7 +28,6 @@ pub enum Focus {
 pub enum Confirm {
     DeleteTask(String),
     DeleteDirection(String),
-    Quit,
 }
 
 /// Нормализовать клавишу: русская раскладка → латинская.
@@ -309,7 +308,6 @@ fn run_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()>
                 continue;
             }
 
-            // Если открыто подтверждение — обрабатываем его.
             if let Some(confirm) = &app.confirm {
                 match normalize_key(key.code) {
                     KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -324,9 +322,6 @@ fn run_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()>
                                 controller::actions::delete_direction(&name)?;
                                 app.reload()?;
                             }
-                            Confirm::Quit => {
-                                app.should_quit = true;
-                            }
                         }
                         app.confirm = None;
                     }
@@ -340,8 +335,8 @@ fn run_loop<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()>
 
             // Иначе — обычная навигация.
             match normalize_key(key.code) {
-                KeyCode::Char('q') => {
-                    app.confirm = Some(Confirm::Quit);
+                KeyCode::F(10) => {
+                    app.should_quit = true;
                 }
                 KeyCode::Tab => app.toggle_focus(),
                 KeyCode::BackTab => app.toggle_focus(),
@@ -480,10 +475,10 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
 fn draw_status(f: &mut Frame, app: &App, area: Rect) {
     let text = match app.focus {
         Focus::Tasks => {
-            " [a] добавить  [e] редактировать  [d] комментарий  [Del] удалить  [Tab] направления  [q] выход "
+            " [a] добавить  [e] редактировать  [d] комментарий  [Del] удалить  [Tab] направления  [F10] выход "
         }
         Focus::Directions => {
-            " [a] добавить  [e] редактировать  [Del] удалить  [Tab] задачи  [q] выход "
+            " [a] добавить  [e] редактировать  [Del] удалить  [Tab] задачи  [F10] выход "
         }
     };
 

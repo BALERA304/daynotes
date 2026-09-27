@@ -515,7 +515,6 @@ pub fn draw_confirm(f: &mut Frame, confirm: &Confirm, area: Rect) {
     let text = match confirm {
         Confirm::DeleteTask(_) => "Удалить задачу? (y/n)",
         Confirm::DeleteDirection(_) => "Удалить направление? (y/n)",
-        Confirm::Quit => "Выйти? (y/n)",
     };
 
     let popup = centered_rect(40, 20, area);
